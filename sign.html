@@ -1,73 +1,90 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Підпис акту</title>
+  <meta charset="UTF-8">
+  <title>Підпис PDF</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.6/dist/signature_pad.umd.min.js"></script>
   <style>
-    body { font-family: sans-serif; margin: 20px; background: #f3f3f3; }
-    iframe { width: 100%; height: 500px; border: 1px solid #ccc; margin-bottom: 20px; }
-    canvas { border: 1px solid #000; background: #fff; }
+    body { font-family: sans-serif; text-align: center; background: #f3f3f3; padding: 20px; }
+    canvas { border: 1px solid #ccc; background: #fff; margin-top: 10px; }
+    #pdfFrame { width: 100%; height: 500px; border: 1px solid #999; margin-bottom: 10px; }
     .controls { margin-top: 10px; }
-    button { padding: 10px 20px; margin-right: 10px; }
+    button { padding: 10px 20px; margin: 5px; }
   </style>
 </head>
 <body>
-  <h2>Підпис акту прийому-передачі</h2>
-
+  <h2>Підпишіть документ</h2>
   <iframe id="pdfFrame"></iframe>
 
-  <p>Підпишіться нижче:</p>
-  <canvas id="signatureCanvas" width="500" height="200"></canvas>
+  <h3>Підпис:</h3>
+  <canvas id="sigPad" width="400" height="150"></canvas>
   <div class="controls">
-    <button id="clearBtn">Очистити</button>
-    <button id="submitBtn">Підписати</button>
+    <button onclick="clearSig()">Очистити</button>
+    <button onclick="submit()">Надіслати</button>
   </div>
 
   <script>
+    const GET_PDF_URL = "https://hook.eu2.make.com/eid2v64wc2higu6e2uibq8kewrllpgcd";
+    const POST_WEBHOOK_URL = "https://hook.eu2.make.com/gmv5k48rfgqmceh5zv4alypttzwqikq4";
+
     const urlParams = new URLSearchParams(window.location.search);
-    const recordId = urlParams.get("recordId");
-    const fileId = urlParams.get("fileId");
+    const recordID = urlParams.get("recordID");
+    const sigPad = new SignaturePad(document.getElementById("sigPad"));
 
-    const iframe = document.getElementById("pdfFrame");
-    iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+    let pdfBytes = null;
 
-    const canvas = document.getElementById("signatureCanvas");
-    const signaturePad = new SignaturePad(canvas);
+    async function loadPDF() {
+      const response = await fetch(`${GET_PDF_URL}?recordID=${recordID}`);
+      pdfBytes = await response.arrayBuffer();
 
-    document.getElementById("clearBtn").addEventListener("click", () => {
-      signaturePad.clear();
-    });
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      document.getElementById("pdfFrame").src = url;
+    }
 
-    document.getElementById("submitBtn").addEventListener("click", async () => {
-      if (signaturePad.isEmpty()) {
-        alert("Будь ласка, підпишіться перш ніж зберегти.");
+    function clearSig() {
+      sigPad.clear();
+    }
+
+    async function submit() {
+      if (sigPad.isEmpty()) {
+        alert("Будь ласка, залиште підпис.");
         return;
       }
 
-      const signatureDataUrl = signaturePad.toDataURL();
+      const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+      const pages = pdfDoc.getPages();
+      const lastPage = pages[pages.length - 1];
 
-      const response = await fetch("https://hook.eu2.make.com/gmv5k48rfgqmceh5zv4alypttzwqikq4", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          recordId,
-          fileId,
-          signature: signatureDataUrl,
-        }),
+      const sigImageBytes = sigPad.toDataURL("image/png");
+      const pngImage = await pdfDoc.embedPng(sigImageBytes);
+
+      const { width, height } = lastPage.getSize();
+      lastPage.drawImage(pngImage, {
+        x: width - 160,
+        y: 40,
+        width: 120,
+        height: 60,
       });
 
-      if (response.ok) {
-        alert("Акт успішно підписано!");
-        window.close();
-      } else {
-        alert("Помилка при надсиланні підпису. Спробуйте ще раз.");
-      }
-    });
+      const signedPdfBytes = await pdfDoc.save();
+      const signedBlob = new Blob([signedPdfBytes], { type: "application/pdf" });
+
+      const formData = new FormData();
+      formData.append("file", signedBlob, "signed.pdf");
+      formData.append("recordID", recordID);
+
+      await fetch(POST_WEBHOOK_URL, {
+        method: "POST",
+        body: formData,
+      });
+
+      alert("Підписано й надіслано!");
+      setTimeout(() => window.close(), 1000);
+    }
+
+    loadPDF();
   </script>
 </body>
 </html>
