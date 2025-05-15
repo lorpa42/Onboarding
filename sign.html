@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Підпис акту</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.6/dist/signature_pad.umd.min.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 20px; background: #f3f3f3; }
+    iframe { width: 100%; height: 500px; border: 1px solid #ccc; margin-bottom: 20px; }
+    canvas { border: 1px solid #000; background: #fff; }
+    .controls { margin-top: 10px; }
+    button { padding: 10px 20px; margin-right: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Підпис акту прийому-передачі</h2>
+
+  <iframe id="pdfFrame"></iframe>
+
+  <p>Підпишіться нижче:</p>
+  <canvas id="signatureCanvas" width="500" height="200"></canvas>
+  <div class="controls">
+    <button id="clearBtn">Очистити</button>
+    <button id="submitBtn">Підписати</button>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const recordId = urlParams.get("recordId");
+    const fileId = urlParams.get("fileId");
+
+    const iframe = document.getElementById("pdfFrame");
+    iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+
+    const canvas = document.getElementById("signatureCanvas");
+    const signaturePad = new SignaturePad(canvas);
+
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      signaturePad.clear();
+    });
+
+    document.getElementById("submitBtn").addEventListener("click", async () => {
+      if (signaturePad.isEmpty()) {
+        alert("Будь ласка, підпишіться перш ніж зберегти.");
+        return;
+      }
+
+      const signatureDataUrl = signaturePad.toDataURL();
+
+      const response = await fetch("https://hook.eu2.make.com/gmv5k48rfgqmceh5zv4alypttzwqikq4", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          recordId,
+          fileId,
+          signature: signatureDataUrl,
+        }),
+      });
+
+      if (response.ok) {
+        alert("Акт успішно підписано!");
+        window.close();
+      } else {
+        alert("Помилка при надсиланні підпису. Спробуйте ще раз.");
+      }
+    });
+  </script>
+</body>
+</html>
