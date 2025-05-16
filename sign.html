@@ -30,8 +30,9 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     const recordID = urlParams.get("recordID");
-    const sigPad = new SignaturePad(document.getElementById("sigPad"));
+    const originalName = urlParams.get("fileName") || "signed.pdf";  // <-- default fallback
 
+    const sigPad = new SignaturePad(document.getElementById("sigPad"));
     let pdfBytes = null;
 
     async function loadPDF() {
@@ -72,8 +73,9 @@
       const signedBlob = new Blob([signedPdfBytes], { type: "application/pdf" });
 
       const formData = new FormData();
-      formData.append("file", signedBlob, "signed.pdf");
+      formData.append("file", signedBlob, originalName);
       formData.append("recordID", recordID);
+      formData.append("originalName", originalName);
 
       await fetch(POST_WEBHOOK_URL, {
         method: "POST",
