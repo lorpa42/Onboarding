@@ -25,16 +25,6 @@
   </div>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const recordID = urlParams.get("recordID");
-    const originalName = urlParams.get("fileName") || "signed.pdf"; // запасний варіант
-
-    const formData = new FormData();
-      formData.append("file", signedBlob, originalName); // 👈 тут ключ
-      formData.append("recordID", recordID);
-      formData.append("originalName", originalName);
-    
-    
     const GET_PDF_URL = "https://hook.eu2.make.com/eid2v64wc2higu6e2uibq8kewrllpgcd";
     const POST_WEBHOOK_URL = "https://hook.eu2.make.com/gmv5k48rfgqmceh5zv4alypttzwqikq4";
 
